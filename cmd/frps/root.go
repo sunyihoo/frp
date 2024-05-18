@@ -3,11 +3,15 @@ package main
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	v1 "github.com/sunyihoo/frp/pkg/config/v1"
 	"github.com/sunyihoo/frp/pkg/util/version"
 )
 
 var (
+	cfgFile string
 	showVersion bool
+
+	serverCfg v1.ServerConfig
 )
 
 var rootCmd = &cobra.Command{
@@ -20,8 +24,13 @@ var rootCmd = &cobra.Command{
 		}
 
 		var (
-			svrCfg *
+			svrCfg         *v1.ServerConfig
+			isLegacyFormat bool
+			err            error
 		)
+		if cfgFile != "" {
+			svrCfg,isLegacyFormat,err = config.
+		}
 	},
 }
 
