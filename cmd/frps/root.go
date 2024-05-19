@@ -29,7 +29,7 @@ var rootCmd = &cobra.Command{
 			err            error
 		)
 		if cfgFile != "" {
-			svrCfg,isLegacyFormat,err = config.
+			svrCfg.isLegacyFormat,err = config.
 		}
 	},
 }
