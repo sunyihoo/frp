@@ -14,10 +14,26 @@ type BaseConfig struct {
 	AuthenticateNewWorkConns bool `ini:"authenticate_new_work_conns" json:"authenticate_new_work_conns"`
 }
 
+func getDefaultBaseConf() BaseConfig {
+	return BaseConfig{
+		AuthenticationMethod:     "token",
+		AuthenticateHeartBeats:   false,
+		AuthenticateNewWorkConns: false,
+	}
+}
+
 type ServerConfig struct {
 	BaseConfig       `ini:",extends"`
 	OidcServerConfig `ini:",extends"`
 	TokenConfig      `ini:",extends"`
+}
+
+func GetDefaultServerConf() ServerConfig {
+	return ServerConfig{
+		BaseConfig:       getDefaultBaseConf(),
+		OidcServerConfig: getDefaultOidcServerConf(),
+		TokenConfig:      getDefaultTokenConf(),
+	}
 }
 
 type OidcServerConfig struct {
@@ -35,8 +51,23 @@ type OidcServerConfig struct {
 	OidcSkipIssuerCheck bool `ini:"oidc_skip_issuer_check" json:"oidc_skip_issuer_check"`
 }
 
+func getDefaultOidcServerConf() OidcServerConfig {
+	return OidcServerConfig{
+		OidcIssuer:          "",
+		OidcAudience:        "",
+		OidcSkipIssuerCheck: false,
+		OidcSkipExpiryCheck: false,
+	}
+}
+
 type TokenConfig struct {
 	// Token 令牌指定用于创建要发送到服务器的密钥的授权令牌。
 	// 服务器必须具有匹配的令牌，授权才能成功。默认情况下，此值为 ""。
 	Token string `ini:"token" json:"token"`
+}
+
+func getDefaultTokenConf() TokenConfig {
+	return TokenConfig{
+		Token: "",
+	}
 }

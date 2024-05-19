@@ -1,6 +1,17 @@
 package legacy
 
-import legacyauth "github.com/sunyihoo/frp/pkg/auth/legacy"
+import (
+	legacyauth "github.com/sunyihoo/frp/pkg/auth/legacy"
+	"gopkg.in/ini.v1"
+)
+
+type HTTPPluginOptions struct {
+	Name      string `ini:"name"`
+	Addr      string `ini:"addr"`
+	Path      string `ini:"path"`
+	Ops       string `ini:"ops"`
+	TLSVerify bool   `ini:"tlsVerify"`
+}
 
 // ServerCommonConf 包含服务器服务的信息。建议使用 GetDefaultServerConf 而不是直接创建此对象,
 // 以便所有未指定的字段都具有合理的默认值。
@@ -85,9 +96,75 @@ type ServerCommonConf struct {
 	// 默认情况下，此值为 true。
 	TCPMux bool `ini:"tcp_mux" json:"tcp_mux"`
 	// TCPMuxKeepaliveInterval 指定 TCP 流多路复用的保持活动间隔。
-	//
-
+	// 如果 TCPMux 为true，则不需要应用层的心跳，因为它只能依赖于 TCPMux 中的心跳
 	TCPMuxKeepaliveInterval int64 `ini:"tcp_mux_keepalive_interval" json:"tcp_mux_keepalive_interval"`
+	// TCPKeepAlive 指定 frpc 和 frps 之间的活动网络连接的保持活动探测器之间的存活时间。
+	// 如果为负数，则禁用keep-alive probes。
+	TCPKeepAlive int64 `ini:"tcp_keepalive" json:"tcp_keepalive"`
+	// Custom404Page 指定要显示的自定义 404 页的路径。
+	// 如果此值为 “”，则将显示默认页面。默认情况下，此值为“”。
+	Custom404Page string `ini:"custom_404_page" json:"custom_404_page"`
+
+	// AllowPorts 指定客户端能够代理到的一组端口。如果此值的长度为 0，则允许所有端口。
+	// 默认情况下，此值为空集。
+	AllowPorts map[int]struct{} `ini:"-" json:"-"`
+	// Original string
+	AllowPortsStr string `ini:"-" json:"-"`
+	// MaxPoolCount 指定每个代理的最大池大小。默认情况下，此值为 5。
+	MaxPoolCount int64 `ini:"max_pool_count" json:"max_pool_count"`
+	// MaxPortsPerClient 指定单个客户端可以代理到的最大端口数。
+	// 如果此值为 0，则不会应用任何限制。默认情况下，此值为 0。
+	MaxPortsPerClient int64 `ini:"max_ports_per_client" json:"max_ports_per_client"`
+	// TLSOnly 指定是否仅接受 TLS 加密的连接。默认情况下，该值为 false。
+	TLSOnly bool `ini:"tls_only" json:"tls_only"`
+	// TLSCertFile 指定服务器将加载的证书文件的路径。如果“tls_cert_file”、“tls_key_file”有效，
+	//则服务器将使用此提供的 tls 配置。否则，服务器将使用自身生成的 tls 配置。
+	TLSCertFile string `ini:"tls_cert_file" json:"tls_cert_file"`
+	// TLSKeyFile 指定服务器将加载的密钥的路径。如果“tls_cert_file”、“tls_key_file”有效，
+	// 则服务器将使用此提供的 tls 配置。否则，服务器将使用自身生成的 tls 配置。
+	TLSKeyFile string `ini:"tls_key_file" json:"tls_key_file"`
+	// TLSTrustedCaFile 指定服务器将加载的客户端证书文件的路径。它仅在“tls_only”为真时才有效。
+	// 如果“tls_trusted_ca_file”有效，服务器将验证每个客户端的证书。
+	TLSTrustedCaFile string `ini:"tls_trusted_ca_file" json:"tls_trusted_ca_file"`
+	// HeartbeatTimeout 指定在终止连接之前等待检测信号的最长时间。
+	// 不建议更改此值。默认情况下，此值为 90。设置负值以禁用它。
+	HeartbeatTimeout int64 `ini:"heartbeat_timeout" json:"heartbeat_timeout"`
+	// UseConnTimeout 指定等待工作连接的最长时间。默认情况下，此值为 10。
+	UserConnTimeout int64 `ini:"user_conn_timeout" json:"user_conn_timeout"`
+	// HTTPPlugins
+	HTTPPlugins map[string]HTTPPluginOptions `ini:"http_conn_timeout" json:"http_conn_timeout"`
+	// UDPPacketSize 指定 UDP 数据包大小 默认情况下，此值为 1500。
+	UDPPacketSize int64 `ini:"udp_packet_size" json:"udp_packet_size"`
+	// PprofEnabled 在仪表板侦听器中启用 golang pprof 处理程序。
+	// 必须先设置仪表板端口。
+	PprofEnabled bool `ini:"pprof_enabled" json:"pprof_enabled"`
+	// NatHoleAnalysisDataReserveHours 指定 reserve nat hole analysis data的小时数。
+	NatHoleAnalysisDataReserveHours int64 `ini:"nat_hole_analysis_data_reserve_hours" json:"nat_hole_analysis_data_reserve_hours"`
 }
 
-func UnmarshalServerConfFromIni(source interface{})
+// GetDefaultServerConf 返回具有合理默认值的服务器配置。
+func GetDefaultServerConf() ServerCommonConf {
+	return ServerCommonConf{
+		ServerConfig: legacyauth.GetDefaultServerConf(),
+	}
+}
+
+func UnmarshalServerConfFromIni(source interface{}) (ServerCommonConf, error) {
+	f, err := ini.LoadSources(ini.LoadOptions{
+		Insensitive:         false,
+		InsensitiveSections: false,
+		InsensitiveKeys:     false,
+		IgnoreInlineComment: true,
+		AllowBooleanKeys:    true,
+	}, source)
+
+	if err != nil {
+		return ServerCommonConf{}, err
+	}
+
+	s, err := f.GetSection("common")
+	if err != nil {
+		return ServerCommonConf{}, err
+	}
+
+}
