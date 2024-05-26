@@ -1,8 +1,21 @@
 package v1
 
-import "github.com/sunyihoo/frp/pkg/util/util"
+import (
+	"github.com/sunyihoo/frp/pkg/util/util"
+	"sync"
+)
+
+var (
+	DisallowUnknownFields   = false
+	DisallowUnKnownFieldsMu sync.Mutex
+)
 
 type AuthScope string
+
+const (
+	AuthScopeHeartBeats   AuthScope = "HeartBeats"
+	AuthScopeNewWorkConns AuthScope = "NewWorkConns"
+)
 
 type AuthMethod string
 

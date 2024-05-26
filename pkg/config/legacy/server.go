@@ -3,6 +3,7 @@ package legacy
 import (
 	legacyauth "github.com/sunyihoo/frp/pkg/auth/legacy"
 	"gopkg.in/ini.v1"
+	"strings"
 )
 
 type HTTPPluginOptions struct {
@@ -43,8 +44,8 @@ type ServerCommonConf struct {
 	// TCPMuxHTTPConnectPort 指定服务器侦听TCP HTTP CONNECT请求的端口。如果该值为0，则服务器不会在单个端口上多路传输TCP请求。
 	// 如果不是，它将侦听HTTP CONNECT请求的此值。默认情况下，此值为0。
 	TCPMuxHTTPConnectPort int `ini:"tcpmux_httpconnect_port" json:"tcpmux_httpconnect_port"`
-	// 如果 TCPMuxPassThrough 为true，则frps不会对流量进行任何更新。
-	TCPMuxPassThrough bool `ini:"tcpmux_passthrough" json:"tcpmux_passthrough"`
+	// 如果 TCPMuxPassthrough 为true，则frps不会对流量进行任何更新。
+	TCPMuxPassthrough bool `ini:"tcpmux_passthrough" json:"tcpmux_passthrough"`
 	// VhostHTTPTimeout 指定Vhost HTTP服务器的响应标头超时（以秒为单位）。默认情况下，此值为60。
 	VhostHTTPTimeout int64 `ini:"vhost_http_timeout" json:"vhost_http_timeout"`
 	// DashboardAddr 指定仪表板绑定到的地址。默认情况下，此值为“0.0.0.0”。
@@ -145,7 +146,30 @@ type ServerCommonConf struct {
 // GetDefaultServerConf 返回具有合理默认值的服务器配置。
 func GetDefaultServerConf() ServerCommonConf {
 	return ServerCommonConf{
-		ServerConfig: legacyauth.GetDefaultServerConf(),
+		ServerConfig:                    legacyauth.GetDefaultServerConf(),
+		BindAddr:                        "0.0.0.0",
+		BindPort:                        7000,
+		QUICKeepalivePeriod:             10,
+		QUICMaxIdleTimeout:              30,
+		QUICMaxIncomingStreams:          100000,
+		VhostHTTPTimeout:                60,
+		DashboardAddr:                   "0.0.0.0",
+		LogFile:                         "console",
+		LogWay:                          "console",
+		LogLevel:                        "info",
+		LogMaxDays:                      3,
+		DetailedErrorsToClient:          true,
+		TCPMux:                          true,
+		TCPMuxKeepaliveInterval:         60,
+		TCPKeepAlive:                    7200,
+		AllowPorts:                      make(map[int]struct{}),
+		MaxPoolCount:                    5,
+		MaxPortsPerClient:               0,
+		HeartbeatTimeout:                90,
+		UserConnTimeout:                 10,
+		HTTPPlugins:                     map[string]HTTPPluginOptions{},
+		UDPPacketSize:                   1500,
+		NatHoleAnalysisDataReserveHours: 7 * 24,
 	}
 }
 
@@ -167,4 +191,46 @@ func UnmarshalServerConfFromIni(source interface{}) (ServerCommonConf, error) {
 		return ServerCommonConf{}, err
 	}
 
+	common := GetDefaultServerConf()
+	err = s.MapTo(&common)
+	if err != nil {
+		return ServerCommonConf{}, err
+	}
+
+	// allow_ports
+	allowPortStr := s.Key("allow_ports").String()
+	if allowPortStr != "" {
+		common.AllowPortsStr = allowPortStr
+	}
+
+	// plugin.xxx
+	pluginOpts := make(map[string]HTTPPluginOptions)
+	for _, section := range f.Sections() {
+		name := section.Name()
+		if !strings.HasPrefix(name, "plugin.") {
+			continue
+		}
+
+		opt, err := loadHTTPPluginOpt(section)
+		if err != nil {
+			return ServerCommonConf{}, err
+		}
+		pluginOpts[opt.Name] = *opt
+	}
+	common.HTTPPlugins = pluginOpts
+
+	return common, nil
+}
+
+func loadHTTPPluginOpt(section *ini.Section) (*HTTPPluginOptions, error) {
+	name := strings.TrimSpace(strings.TrimPrefix(section.Name(), "plugin."))
+
+	opt := &HTTPPluginOptions{}
+	err := section.MapTo(opt)
+	if err != nil {
+		return nil, err
+	}
+
+	opt.Name = name
+	return opt, nil
 }
