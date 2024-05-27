@@ -90,9 +90,9 @@ func (c *LogConfig) Complete() {
 }
 
 type HTTPPluginOptions struct {
-	Name      string `json:"name"`
-	Addr      string `json:"addr"`
-	Path      string `json:"path"`
-	Ops       string `json:"ops"`
-	TLSVerify bool   `json:"tlsVerify,omitempty"`
+	Name      string   `json:"name"`
+	Addr      string   `json:"addr"`
+	Path      string   `json:"path"`
+	Ops       []string `json:"ops"`
+	TLSVerify bool     `json:"tlsVerify,omitempty"`
 }

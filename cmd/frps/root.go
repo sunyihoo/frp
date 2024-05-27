@@ -54,6 +54,8 @@ var rootCmd = &cobra.Command{
 			svrCfg = &serverCfg
 		}
 		// todo
+		warning,err :=
+
 		return nil
 	},
 }
