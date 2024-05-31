@@ -7,10 +7,10 @@ import (
 	"slices"
 )
 
-func ValidationServerConfig(c *v1.ServerConfig) (Warning, error) {
+func ValidateServerConfig(c *v1.ServerConfig) (Warning, error) {
 	var (
-		warning Warning
-		errs    error
+		warnings Warning
+		errs     error
 	)
 	if !slices.Contains(SupportedAuthMethods, c.Auth.Method) {
 		errs = AppendError(errs, fmt.Errorf("invalid auth method, optional values are %v", SupportedAuthMethods))
@@ -36,8 +36,8 @@ func ValidationServerConfig(c *v1.ServerConfig) (Warning, error) {
 
 	for _, p := range c.HTTPPlugins {
 		if !lo.Every(SupportedHTTPPlugins, p.Ops) {
-			errs = AppendError()
+			errs = AppendError(errs, fmt.Errorf("invalid http plugin ops, optional values are %v", SupportedHTTPPlugins))
 		}
 	}
-
+	return warnings, errs
 }

@@ -5,6 +5,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/sunyihoo/frp/pkg/config"
 	v1 "github.com/sunyihoo/frp/pkg/config/v1"
+	"github.com/sunyihoo/frp/pkg/config/v1/validation"
+	"github.com/sunyihoo/frp/pkg/util/util/log"
 	"github.com/sunyihoo/frp/pkg/util/version"
 	"os"
 )
@@ -53,8 +55,17 @@ var rootCmd = &cobra.Command{
 			serverCfg.Complete()
 			svrCfg = &serverCfg
 		}
-		// todo
-		warning,err :=
+
+		warning, err := validation.ValidateServerConfig(svrCfg)
+		if warning != nil {
+			fmt.Printf("WARNING: %v\n", warning)
+		}
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		if err :=
 
 		return nil
 	},
@@ -62,4 +73,16 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 
+}
+
+func runServer(cfg *v1.ServerConfig) (err error) {
+	log.InitLogger(cfg.Log.To, cfg.Log.Level, int(cfg.Log.MaxDays), cfg.Log.DisabledPrintColor)
+
+	if cfgFile != "" {
+		log.Infof("frps uses config file: %s", cfgFile)
+	} else {
+		log.Infof("frps uses command line arguments for config")
+	}
+
+	svr,err := server.New
 }

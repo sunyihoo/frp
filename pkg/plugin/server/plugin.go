@@ -1,5 +1,7 @@
 package server
 
+import "context"
+
 const (
 	OpLogin       = "Login"
 	OpNewProxy    = "NewProxy"
@@ -8,3 +10,9 @@ const (
 	OpNewWorkConn = "NewWorkConn"
 	OpNewUserConn = "NewUserConn"
 )
+
+type Plugin interface {
+	Name() string
+	IsSupport(op string) bool
+	Handle(ctx context.Context, op string, content interface{}) (res *Response, retContent interface{}, err error)
+}
