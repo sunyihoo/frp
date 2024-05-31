@@ -23,7 +23,7 @@ type ServerConfig struct {
 	// VhostHTTPPort 指定服务器侦听HTTP Vhost请求的端口。如果此值为0，则服务器将不会侦听HTTP请求。
 	VhostHTTPPort int `json:"vhostHTTPPort,omitempty"`
 	// VhostHTTPTimeout 指定Vhost HTTP服务器的响应标头超时（以秒为单位）。默认情况下，此值为60。
-	VhostHTTPTimeout int `json:"vhostHTTPTimeout,omitempty"`
+	VhostHTTPTimeout int64 `json:"vhostHTTPTimeout,omitempty"`
 	// VhostHTTPSPort 指定服务器侦听HTTPS Vhost请求的端口。如果此值为0，则服务器将不会侦听HTTPS请求。
 	VhostHTTPSPort int `json:"vhostHTTPSPort,omitempty"`
 	// TCPMuxHTTPConnectPort 指定服务器侦听TCP HTTP CONNECT请求的端口。

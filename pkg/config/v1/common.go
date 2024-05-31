@@ -1,8 +1,21 @@
 package v1
 
-import "github.com/sunyihoo/frp/pkg/util/util"
+import (
+	"github.com/sunyihoo/frp/pkg/util/util"
+	"sync"
+)
+
+var (
+	DisallowUnknownFields   = false
+	DisallowUnKnownFieldsMu sync.Mutex
+)
 
 type AuthScope string
+
+const (
+	AuthScopeHeartBeats   AuthScope = "HeartBeats"
+	AuthScopeNewWorkConns AuthScope = "NewWorkConns"
+)
 
 type AuthMethod string
 
@@ -77,9 +90,9 @@ func (c *LogConfig) Complete() {
 }
 
 type HTTPPluginOptions struct {
-	Name      string `json:"name"`
-	Addr      string `json:"addr"`
-	Path      string `json:"path"`
-	Ops       string `json:"ops"`
-	TLSVerify bool   `json:"tlsVerify,omitempty"`
+	Name      string   `json:"name"`
+	Addr      string   `json:"addr"`
+	Path      string   `json:"path"`
+	Ops       []string `json:"ops"`
+	TLSVerify bool     `json:"tlsVerify,omitempty"`
 }
