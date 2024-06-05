@@ -96,3 +96,8 @@ type HTTPPluginOptions struct {
 	Ops       []string `json:"ops"`
 	TLSVerify bool     `json:"tlsVerify,omitempty"`
 }
+
+type HTTPHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}

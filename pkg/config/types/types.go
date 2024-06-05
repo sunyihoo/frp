@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+type BandwidthWithQuantity struct {
+	s string // MB or KB
+	i int64  // bytes
+}
+
 type PortsRange struct {
 	Start  int `json:"start,omitempty"`
 	End    int `json:"end,omitempty"`
