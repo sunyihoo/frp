@@ -8,6 +8,7 @@ import (
 	"github.com/sunyihoo/frp/pkg/config/v1/validation"
 	"github.com/sunyihoo/frp/pkg/util/util/log"
 	"github.com/sunyihoo/frp/pkg/util/version"
+	"github.com/sunyihoo/frp/server"
 	"os"
 )
 
@@ -65,14 +66,19 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if err :=
-
+		if err := runServer(svrCfg); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 		return nil
 	},
 }
 
 func Execute() {
-
+	rootCmd.SetGlobalNormalizationFunc(config.WordSepNormalizeFunc)
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
 
 func runServer(cfg *v1.ServerConfig) (err error) {
@@ -84,5 +90,10 @@ func runServer(cfg *v1.ServerConfig) (err error) {
 		log.Infof("frps uses command line arguments for config")
 	}
 
-	svr,err := server.New
+	svr, err := server.NewService(cfg)
+	if err != nil {
+		return err
+	}
+	log.Infof("frps started successfully")
+	svr.
 }

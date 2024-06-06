@@ -9,6 +9,7 @@ import (
 	v1 "github.com/sunyihoo/frp/pkg/config/v1"
 	plugin "github.com/sunyihoo/frp/pkg/plugin/server"
 	"github.com/sunyihoo/frp/pkg/ssh"
+	"github.com/sunyihoo/frp/pkg/transport"
 	httppkg "github.com/sunyihoo/frp/pkg/util/http"
 	netpkg "github.com/sunyihoo/frp/pkg/util/net"
 	"github.com/sunyihoo/frp/pkg/util/vhost"
@@ -74,5 +75,25 @@ type Service struct {
 }
 
 func NewService(cfg *v1.ServerConfig) (*Service, error) {
+	tlsConfig, err := transport.NewServerTLSConfig(
+		cfg.Transport.TLS.CertFile,
+		cfg.Transport.TLS.KeyFile,
+		cfg.Transport.TLS.TrustedCaFile,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var webServer *httppkg.Server
+	if cfg.WebServer.Port > 0 {
+		ws, err := httppkg.NewServer(cfg.WebServer)
+		if err != nil {
+			return nil, err
+		}
+		webServer = ws
+
+		modle
+	}
+
 	return nil, nil
 }

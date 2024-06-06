@@ -32,7 +32,12 @@ frps:
 frpc:
 	env CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -tags frpc -o bin/fprc ./cmd/frpc
 
+stat:
+	git show --shortstat
+
+
 clean:
 	rm -f ./bin/frpc
 	rm -f ./bin/frps
 	rm -rf ./lastversion
+

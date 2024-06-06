@@ -1,6 +1,7 @@
 package util
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"strconv"
 	"strings"
@@ -58,4 +59,9 @@ func ParseRangeNumbers(rangeStr string) (numbers []int64, err error) {
 		}
 	}
 	return
+}
+
+func ConstantTimeEqString(a, b string) bool {
+	// todo 学习
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
