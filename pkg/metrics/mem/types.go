@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+const (
+	ReserveDays = 7
+)
+
 type ProxyStatistics struct {
 	Name          string
 	ProxyType     string

@@ -42,7 +42,7 @@ type ResourceController struct {
 	TCPPortManager *ports.Manager
 
 	// 管理所有 UDP 端口
-	UDPPortManager *vhost.HTTPReverseProxy
+	UDPPortManager *ports.Manager
 
 	// 对于 HTTP 代理，转发 HTTP 请求
 	HTTPReverseProxy *vhost.HTTPReverseProxy

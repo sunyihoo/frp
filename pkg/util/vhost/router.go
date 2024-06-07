@@ -18,3 +18,10 @@ type Router struct {
 	// 在此处存储任何对象
 	payload interface{}
 }
+
+func NewRouters() *Routers {
+	return &Routers{
+		indexByDomain: make(map[string]routerByHTTPUser),
+	}
+
+}

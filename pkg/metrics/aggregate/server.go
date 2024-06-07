@@ -14,10 +14,20 @@
 
 package aggregate
 
-import "github.com/sunyihoo/frp/server/metrics"
+import (
+	"github.com/sunyihoo/frp/pkg/metrics/mem"
+	"github.com/sunyihoo/frp/pkg/metrics/prometheus"
+	"github.com/sunyihoo/frp/server/metrics"
+)
 
+// EnableMem 开始将指标标记到内存监控系统。
 func EnableMem() {
-	sm.Add(mem.Me)
+	sm.Add(mem.ServerMetrics)
+}
+
+// EnablePrometheus 开始将指标标记为 Prometheus。
+func EnablePrometheus() {
+	sm.Add(prometheus.ServerMetrics)
 }
 
 var sm = &serverMetrics{}

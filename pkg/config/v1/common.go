@@ -19,6 +19,11 @@ const (
 
 type AuthMethod string
 
+const (
+	AuthMethodToken AuthMethod = "token"
+	AuthMethodOIDC  AuthMethod = "oidc"
+)
+
 // QUICOptions protocol options
 type QUICOptions struct {
 	KeepalivePeriod    int `json:"keepalivePeriod,omitempty"`

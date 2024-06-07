@@ -16,3 +16,9 @@ type Manager struct {
 
 	mu sync.RWMutex
 }
+
+func NewManager() *Manager {
+	return &Manager{
+		listeners: make(map[string]*listenerBundle),
+	}
+}

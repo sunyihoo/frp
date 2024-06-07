@@ -106,7 +106,7 @@ type AuthOIDCServerConfig struct {
 	Issuer string `json:"issuer,omitempty"`
 	// Audiences 访问群体指定验证时OIDC令牌应包含的访问群体
 	// 如果此值为空，则将跳过访问群体（“客户端ID”）验证。
-	Audiences string `json:"audiences,omitempty"`
+	Audience string `json:"audiences,omitempty"`
 
 	// SkipExpiryCheck 指定是否跳过检查OIDC令牌是否已过期。
 	SkipExpiryCheck bool `json:"skipExpiryCheck,omitempty"`

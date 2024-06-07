@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics
+package util
 
-import (
-	"github.com/sunyihoo/frp/pkg/metrics/aggregate"
-)
-
-var (
-	EnableMem        = aggregate.EnableMem
-	EnablePrometheus = aggregate.EnablePrometheus
-)
+func EmptyOr[T comparable](v T, fallback T) T {
+	var zero T
+	if zero == v {
+		return fallback
+	}
+	return v
+}

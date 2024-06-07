@@ -1,18 +1,20 @@
 package util
 
 import (
+	"crypto/md5"
 	"crypto/subtle"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-func EmptyOr[T comparable](v T, fallback T) T {
-	var zero T
-	if zero == v {
-		return fallback
-	}
-	return v
+func GetAuthKey(token string, timestamp int64) (key string) {
+	md5Ctx := md5.New()
+	md5Ctx.Write([]byte(token))
+	md5Ctx.Write([]byte(strconv.FormatInt(timestamp, 10)))
+	data := md5Ctx.Sum(nil)
+	return hex.EncodeToString(data)
 }
 
 func ParseRangeNumbers(rangeStr string) (numbers []int64, err error) {

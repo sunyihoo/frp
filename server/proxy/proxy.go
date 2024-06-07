@@ -31,3 +31,9 @@ type Manager struct {
 
 	mu sync.RWMutex
 }
+
+func NewManager() *Manager {
+	return &Manager{
+		pxys: make(map[string]Proxy),
+	}
+}

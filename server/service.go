@@ -6,7 +6,9 @@ import (
 	"github.com/fatedier/golib/net/mux"
 	quic "github.com/quic-go/quic-go"
 	"github.com/sunyihoo/frp/pkg/auth"
+	"github.com/sunyihoo/frp/pkg/auth/legacy"
 	v1 "github.com/sunyihoo/frp/pkg/config/v1"
+	modelmetrics "github.com/sunyihoo/frp/pkg/metrics"
 	plugin "github.com/sunyihoo/frp/pkg/plugin/server"
 	"github.com/sunyihoo/frp/pkg/ssh"
 	"github.com/sunyihoo/frp/pkg/transport"
@@ -14,7 +16,9 @@ import (
 	netpkg "github.com/sunyihoo/frp/pkg/util/net"
 	"github.com/sunyihoo/frp/pkg/util/vhost"
 	"github.com/sunyihoo/frp/server/controller"
+	"github.com/sunyihoo/frp/server/ports"
 	"github.com/sunyihoo/frp/server/proxy"
+	"github.com/sunyihoo/frp/server/visitor"
 	"net"
 )
 
@@ -47,7 +51,7 @@ type Service struct {
 	pxyManager *proxy.Manager
 
 	// 管理所有代理
-	pluginManger *plugin.Manager
+	pluginManager *plugin.Manager
 
 	// HTTP 虚拟主机路由器
 	httpVhostRouter *vhost.Routers
@@ -92,7 +96,31 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 		}
 		webServer = ws
 
-		modle
+		modelmetrics.EnableMem()
+		if cfg.EnablePrometheus {
+			modelmetrics.EnablePrometheus()
+		}
+	}
+
+	svr := &Service{
+		ctlManager:    NewControlManager(),
+		pxyManager:    proxy.NewManager(),
+		pluginManager: plugin.NewManager(),
+		rc: &controller.ResourceController{
+			VisitorManager: visitor.NewManager(),
+			TCPPortManager: ports.NewManager("tcp", cfg.ProxyBindAddr, cfg.AllowPorts),
+			UDPPortManager: ports.NewManager("udp", cfg.ProxyBindAddr, cfg.AllowPorts),
+		},
+		sshTunnelListener: netpkg.NewInternalListener(),
+		httpVhostRouter:   vhost.NewRouters(),
+		authVerifier:      auth.NewAuthVerifier(cfg.Auth),
+		webServer:         webServer,
+		tlsConfig:         tlsConfig,
+		cfg:               cfg,
+		ctx:               context.Background(),
+	}
+	if webServer != nil {
+		webServer.
 	}
 
 	return nil, nil

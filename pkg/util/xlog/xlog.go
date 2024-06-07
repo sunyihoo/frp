@@ -1,4 +1,4 @@
-// Copyright 2023 The frp Authors
+// Copyright 2019 fatedier, fatedier@gmail.com
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics
+package xlog
 
-import (
-	"github.com/sunyihoo/frp/pkg/metrics/aggregate"
-)
+type LogPrefix struct {
+	// Name 是前缀的名称，它不会显示在日志中，而是用于标识前缀。
+	Name string
+	// Value 是前缀的值，它将显示在日志中。
+	Value string
+	// 优先级较高的前缀将首先显示，默认值为 10。
+	Priority int
+}
 
-var (
-	EnableMem        = aggregate.EnableMem
-	EnablePrometheus = aggregate.EnablePrometheus
-)
+// Logger 不是前缀操作的线程安全
+type Logger struct {
+	prefixes []LogPrefix
+
+	prefixString string
+}

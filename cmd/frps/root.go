@@ -6,7 +6,7 @@ import (
 	"github.com/sunyihoo/frp/pkg/config"
 	v1 "github.com/sunyihoo/frp/pkg/config/v1"
 	"github.com/sunyihoo/frp/pkg/config/v1/validation"
-	"github.com/sunyihoo/frp/pkg/util/util/log"
+	"github.com/sunyihoo/frp/pkg/util/log"
 	"github.com/sunyihoo/frp/pkg/util/version"
 	"github.com/sunyihoo/frp/server"
 	"os"
