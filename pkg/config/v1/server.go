@@ -49,9 +49,9 @@ type ServerConfig struct {
 	// DetailedErrorsToClient 定义是否将特定错误（带有调试信息）发送到frpc。
 	// 默认情况下，此值为true。
 	DetailedErrorsToClient *bool `json:"detailedErrorsToClient,omitempty"`
-	// MaxPortsPerClient指定单个客户端可以代理到的最大端口数。
+	// MaxPortsPerClient 指定单个客户端可以代理到的最大端口数。
 	// 如果此值为0，则不受限制。
-	MaxPortsClient int64 `json:"maxPortsClient,omitempty"`
+	MaxPortsPerClient int64 `json:"maxPortsPerClient,omitempty"`
 	// UserConnTimeout 指定等待工作连接的最长时间。默认情况下，此值为10。
 	UserConnTimeout int64 `json:"userConnTimeout,omitempty"`
 	// UDPPacketSize 指定UDP数据包大小默认情况下，此值为1500。

@@ -17,6 +17,23 @@ type PortsRange struct {
 	Single int `json:"single,omitempty"`
 }
 
+type PortsRangeSlice []PortsRange
+
+func (p PortsRangeSlice) String() string {
+	if len(p) == 0 {
+		return ""
+	}
+	strs := make([]string, 0)
+	for _, v := range p {
+		if v.Single > 0 {
+			strs = append(strs, strconv.Itoa(v.Single))
+		} else {
+			strs = append(strs, strconv.Itoa(v.Start)+"-"+strconv.Itoa(v.End))
+		}
+	}
+	return strings.Join(strs, ",")
+}
+
 // NewPortsRangeSliceFromString the format of str is like "1000-2000,3000,4000-5000"
 func NewPortsRangeSliceFromString(str string) ([]PortsRange, error) {
 	str = strings.TrimSpace(str)

@@ -16,15 +16,17 @@ package http
 
 import (
 	"crypto/tls"
-	"github.com/gorilla/mux"
-	"github.com/sunyihoo/frp/assets"
-	v1 "github.com/sunyihoo/frp/pkg/config/v1"
-	netpkg "github.com/sunyihoo/frp/pkg/util/net"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"strconv"
 	"time"
+
+	"github.com/gorilla/mux"
+
+	"github.com/sunyihoo/frp/assets"
+	v1 "github.com/sunyihoo/frp/pkg/config/v1"
+	netpkg "github.com/sunyihoo/frp/pkg/util/net"
 )
 
 var (
@@ -83,6 +85,36 @@ func NewServer(cfg v1.WebServerConfig) (*Server, error) {
 	}
 	s.authMiddleware = netpkg.NewHTTPAuthMiddleware(cfg.User, cfg.Password).SetAuthFailDelay(200 * time.Second).Middleware
 	return s, nil
+}
+
+func (s *Server) Address() string {
+	return s.addr
+}
+
+func (s *Server) Run() error {
+	ln := s.ln
+	if s.tlsCfg != nil {
+		ln = tls.NewListener(ln, s.tlsCfg)
+	}
+	return s.hs.Serve(ln)
+}
+
+func (s *Server) Close() error {
+	return s.hs.Close()
+}
+
+type RouterRegisterHelper struct {
+	Router         *mux.Router
+	AssetsFS       http.FileSystem
+	AuthMiddleware mux.MiddlewareFunc
+}
+
+func (s *Server) RouteRegister(register func(helper *RouterRegisterHelper)) {
+	register(&RouterRegisterHelper{
+		Router:         s.router,
+		AssetsFS:       assets.FileSystem,
+		AuthMiddleware: s.authMiddleware,
+	})
 }
 
 func (s *Server) registerPprofHandlers() {

@@ -71,7 +71,7 @@ func Convert_ServerCommonConf_To_v1(conf *ServerCommonConf) *v1.ServerConfig {
 	out.Transport.TLS.KeyFile = conf.TLSKeyFile
 	out.Transport.TLS.TrustedCaFile = conf.TLSTrustedCaFile
 
-	out.MaxPortsClient = conf.MaxPortsPerClient
+	out.MaxPortsPerClient = conf.MaxPortsPerClient
 
 	for _, v := range conf.HTTPPlugins {
 		out.HTTPPlugins = append(out.HTTPPlugins, v1.HTTPPluginOptions{

@@ -6,7 +6,6 @@ import (
 	"github.com/fatedier/golib/net/mux"
 	quic "github.com/quic-go/quic-go"
 	"github.com/sunyihoo/frp/pkg/auth"
-	"github.com/sunyihoo/frp/pkg/auth/legacy"
 	v1 "github.com/sunyihoo/frp/pkg/config/v1"
 	modelmetrics "github.com/sunyihoo/frp/pkg/metrics"
 	plugin "github.com/sunyihoo/frp/pkg/plugin/server"
@@ -120,7 +119,7 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 		ctx:               context.Background(),
 	}
 	if webServer != nil {
-		webServer.
+		webServer.RouteRegister(svr.registerRouterHandles)
 	}
 
 	return nil, nil
