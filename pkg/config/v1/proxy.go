@@ -68,6 +68,11 @@ type HealthCheckConfig struct {
 	HTTPHeaders []HTTPHeader `json:"HTTPHeaders,omitempty"`
 }
 
+type DomainConfig struct {
+	CustomDomains []string `json:"customDomains,omitempty"`
+	SubDomain     string   `json:"subDomain,omitempty"`
+}
+
 type ProxyBaseConfig struct {
 	Name        string            `json:"name"`
 	Type        string            `json:"type"`
@@ -90,3 +95,16 @@ type ProxyConfigurer interface {
 	// 此函数将在 frps 端调用。
 	UnmarshalFromMsg(*msg.NewProxy)
 }
+
+type ProxyType string
+
+const (
+	ProxyTypeTcp    ProxyType = "tcp"
+	ProxyTypeUDP    ProxyType = "udp"
+	ProxyTypeTCPMUX ProxyType = "tcpmux"
+	ProxyTypeHTTP   ProxyType = "http"
+	ProxyTypeHTTPS  ProxyType = "https"
+	ProxyTypeSTCP   ProxyType = "stcp"
+	ProxyTypeXTCP   ProxyType = "xtcp"
+	ProxyTypeSUDP   ProxyType = "sudp"
+)

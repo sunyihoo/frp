@@ -37,3 +37,10 @@ func NewManager() *Manager {
 		pxys: make(map[string]Proxy),
 	}
 }
+
+func (pm *Manager) GetByName(name string) (pxy Proxy, ok bool) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	pxy, ok = pm.pxys[name]
+	return
+}

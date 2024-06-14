@@ -15,7 +15,7 @@
 package mem
 
 import (
-	"github.com/fatedier/golib/log"
+	"github.com/sunyihoo/frp/pkg/util/log"
 	"github.com/sunyihoo/frp/pkg/util/metric"
 	server "github.com/sunyihoo/frp/server/metrics"
 	"sync"
