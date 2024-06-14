@@ -54,7 +54,7 @@ type ResourceController struct {
 	NatHoleController *nathole.Controller
 
 	// 利用 HTTP CONNECT 方法在一个 TCP 连接上多路复用多个流 todo ?
-	TCPMuxController *tcpmux.HTTPConnectTCPMuxer
+	TCPMuxHTTPConnectMuxer *tcpmux.HTTPConnectTCPMuxer
 
 	// 所有服务端管理者插件
 	PluginManager *plugin.Manager

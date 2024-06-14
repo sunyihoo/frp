@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"github.com/fatedier/golib/net/mux"
 	quic "github.com/quic-go/quic-go"
 	"github.com/sunyihoo/frp/pkg/auth"
@@ -19,6 +20,7 @@ import (
 	"github.com/sunyihoo/frp/server/proxy"
 	"github.com/sunyihoo/frp/server/visitor"
 	"net"
+	"strconv"
 )
 
 type Service struct {
@@ -120,6 +122,19 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 	}
 	if webServer != nil {
 		webServer.RouteRegister(svr.registerRouterHandles)
+	}
+
+	// Create tcpmux httpconnect multiplexer. 创建 tcpmux httpconnect 多路复用器。
+	if cfg.TCPMuxHTTPConnectPort > 0 {
+		var l net.Listener
+		address := net.JoinHostPort(cfg.ProxyBindAddr, strconv.Itoa(cfg.TCPMuxHTTPConnectPort))
+		l, err = net.Listen("tcp", address)
+		if err != nil {
+			return nil, fmt.Errorf("create server listener error, %v", err)
+		}
+
+		svr.rc.TCPMuxHTTPConnectMuxer, err = tcpmux.HttpC
+
 	}
 
 	return nil, nil
