@@ -14,6 +14,14 @@ type TCPMuxGroupCtl struct {
 	mu                     sync.Mutex
 }
 
+// NewTCPMuxGroupCtl return a new TCPMuxGroupCtl
+func NewTCPMuxGroupCtl(tcpMuxHTTPConnectTcpMuxer *tcpmux.HTTPConnectTCPMuxer) *TCPMuxGroupCtl {
+	return &TCPMuxGroupCtl{
+		groups:                 make(map[string]*TCPMuxGroup),
+		tcpMuxHTTPConnectMuxer: tcpMuxHTTPConnectTcpMuxer,
+	}
+}
+
 type TCPMuxGroup struct {
 	group           string
 	groupKey        string

@@ -16,6 +16,13 @@ type HTTPGroupController struct {
 	mu sync.Mutex
 }
 
+func NewHTTPGroupController(vhostRouter *vhost.Routers) *HTTPGroupController {
+	return &HTTPGroupController{
+		groups:      make(map[string]*HTTPGroup),
+		vhostRouter: vhostRouter,
+	}
+}
+
 type HTTPGroup struct {
 	group           string
 	groupKey        string

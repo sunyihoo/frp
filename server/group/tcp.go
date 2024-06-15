@@ -14,6 +14,14 @@ type TCPGroupCtl struct {
 	mu          sync.Mutex
 }
 
+// NewTCPGroupCtl return a new TCPGroupCtl
+func NewTCPGroupCtl(portManager *ports.Manager) *TCPGroupCtl {
+	return &TCPGroupCtl{
+		groups:      make(map[string]*TCPGroup),
+		portManager: portManager,
+	}
+}
+
 // TCPGroup 将路由连接到不同的代理
 type TCPGroup struct {
 	group    string
