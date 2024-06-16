@@ -4,6 +4,7 @@ import (
 	"github.com/sunyihoo/frp/pkg/msg"
 	"github.com/sunyihoo/frp/pkg/transport"
 	"sync"
+	"time"
 )
 
 type ClientCfg struct {
@@ -40,4 +41,12 @@ type Controller struct {
 	analyzer   *Analyzer
 
 	mu sync.Mutex
+}
+
+func NewController(analysisDataReserveDuration time.Duration) (*Controller, error) {
+	return &Controller{
+		clientCfgs: make(map[string]*ClientCfg),
+		sessions:   make(map[string]*Session),
+		analyzer:   NewAnalyzer(analysisDataReserveDuration),
+	}, nil
 }

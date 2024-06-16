@@ -1,3 +1,17 @@
+// Copyright 2017 fatedier, fatedier@gmail.com
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package vhost
 
 import (
@@ -5,9 +19,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/fatedier/golib/pool"
-	httppkg "github.com/sunyihoo/frp/pkg/util/http"
-	"github.com/sunyihoo/frp/pkg/util/log"
 	stdlog "log"
 	"net"
 	"net/http"
@@ -15,6 +26,12 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	libio "github.com/fatedier/golib/io"
+	"github.com/fatedier/golib/pool"
+
+	httppkg "github.com/sunyihoo/frp/pkg/util/http"
+	"github.com/sunyihoo/frp/pkg/util/log"
 )
 
 var ErrNoRouteFound = errors.New("no route found")
@@ -148,6 +165,27 @@ func (rp *HTTPReverseProxy) CreateConnection(reqRouteInfo *RequestRouteInfo, byE
 	return nil, fmt.Errorf("%v: %s %s %s", ErrNoRouteFound, host, reqRouteInfo.URL, reqRouteInfo.HTTPUser)
 }
 
+func (rp *HTTPReverseProxy) GetRouteConfig(domain, location, routeByHTTPUser string) *RouteConfig {
+	vr, ok := rp.getVhost(domain, location, routeByHTTPUser)
+	if ok {
+		log.Debugf("get new HTTP request host [%s] path [%s] httpuser [%s]", domain, location, routeByHTTPUser)
+		return vr.payload.(*RouteConfig)
+	}
+	return nil
+}
+
+func (rp *HTTPReverseProxy) CheckAuth(domain, location, routeByHTTPUser, user, passwd string) bool {
+	vr, ok := rp.getVhost(domain, location, routeByHTTPUser)
+	if ok {
+		checkUser := vr.payload.(*RouteConfig).Username
+		checkPasswd := vr.payload.(*RouteConfig).Password
+		if (checkUser != "" || checkPasswd != "") && (checkUser != user || checkPasswd != passwd) {
+			return false
+		}
+	}
+	return true
+}
+
 // getVhost tries to get vhost router by route policy
 func (rp *HTTPReverseProxy) getVhost(domain, location, routeByHTTPUser string) (*Router, bool) {
 	findRouter := func(inDomain, inLocation, inRouteByHTTPUser string) (*Router, bool) {
@@ -194,4 +232,92 @@ func (rp *HTTPReverseProxy) getVhost(domain, location, routeByHTTPUser string) (
 		return vr, true
 	}
 	return nil, false
+}
+
+func (rp *HTTPReverseProxy) connectHandler(rw http.ResponseWriter, req *http.Request) {
+	hj, ok := rw.(http.Hijacker)
+	if !ok {
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	client, _, err := hj.Hijack()
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	remote, err := rp.CreateConnection(req.Context().Value(RouteInfoKey).(*RouteInfo), false)
+	if err != nil {
+		_ = NotFoundResponse().Write(client)
+		client.Close()
+		return
+	}
+	_ = req.Write(remote)
+	go libio.Join(remote, client)
+}
+
+func parseBasicAuth(auth string) (username, password string, ok bool) {
+	const prefix = "Basic "
+	// Case-insensitive prefix match. See Issue 22736.
+	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+		return
+	}
+	c, err := base64.StdEncoding.DecodeString(auth[len(prefix):])
+	if err != nil {
+		return
+	}
+	cs := string(c)
+	s := strings.IndexByte(cs, ':')
+	if s < 0 {
+		return
+	}
+	return cs[:s], cs[s+1:], true
+}
+
+func (rp *HTTPReverseProxy) injectRequestInfoToCtx(req *http.Request) *http.Request {
+	user := ""
+	if req.URL.Host != "" {
+		proxyAuth := req.Header.Get("Proxy-Authorization")
+		if proxyAuth != "" {
+			user, _, _ = parseBasicAuth(proxyAuth)
+		}
+	}
+	if user == "" {
+		user, _, _ = req.BasicAuth()
+	}
+
+	reqRouteInfo := &RequestRouteInfo{
+		URL:        req.URL.Path,
+		Host:       req.Host,
+		HTTPUser:   user,
+		RemoteAddr: req.RemoteAddr,
+		URLHost:    req.URL.Host,
+	}
+
+	originalHost, _ := httppkg.CanonicalHost(reqRouteInfo.Host)
+	rc := rp.GetRouteConfig(originalHost, reqRouteInfo.URL, reqRouteInfo.HTTPUser)
+
+	newCtx := req.Context()
+	newCtx = context.WithValue(newCtx, RouteInfoKey, reqRouteInfo)
+	newCtx = context.WithValue(newCtx, RouteConfigKey, rc)
+	return req.Clone(newCtx)
+}
+
+func (rp *HTTPReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	domain, _ := httppkg.CanonicalHost(req.Host)
+	location := req.URL.Path
+	user, passwd, _ := req.BasicAuth()
+	if !rp.CheckAuth(domain, location, user, user, passwd) {
+		rw.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	newreq := rp.injectRequestInfoToCtx(req)
+	if req.Method == http.MethodConnect {
+		rp.connectHandler(rw, newreq)
+	} else {
+		rp.proxy.ServeHTTP(rw, newreq)
+	}
 }

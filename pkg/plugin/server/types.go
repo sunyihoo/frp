@@ -14,6 +14,8 @@
 
 package server
 
+import "github.com/sunyihoo/frp/pkg/msg"
+
 type Request struct {
 	Version string      `json:"version"`
 	Op      string      `json:"op"`
@@ -25,6 +27,12 @@ type Response struct {
 	RejectReason string      `json:"reject_reason"`
 	Unchange     bool        `json:"unchange"`
 	Content      interface{} `json:"content"`
+}
+
+type LoginContent struct {
+	msg.Login
+
+	ClientAddress string `json:"client_address,omitempty"`
 }
 
 type UserInfo struct {

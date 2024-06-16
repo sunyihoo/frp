@@ -48,7 +48,7 @@ type ResourceController struct {
 	HTTPReverseProxy *vhost.HTTPReverseProxy
 
 	// 对于 HTTPS 代理，按主机名和其他信息将请求路由到不同的客户端
-	VhostHTTPSMuxer *vhost.HTTPMuxer
+	VhostHTTPSMuxer *vhost.HTTPSMuxer
 
 	// 用于连接nat hole的控制器
 	NatHoleController *nathole.Controller

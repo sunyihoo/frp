@@ -14,6 +14,14 @@
 
 package server
 
+import (
+	"context"
+	"errors"
+	"fmt"
+	"github.com/sunyihoo/frp/pkg/util/util"
+	"github.com/sunyihoo/frp/pkg/util/xlog"
+)
+
 type Manager struct {
 	loginPlugins       []Plugin
 	newProxyPlugins    []Plugin
@@ -53,4 +61,39 @@ func (m *Manager) Register(p Plugin) {
 	if p.IsSupport(OpNewUserConn) {
 		m.newUserConnPlugins = append(m.newUserConnPlugins, p)
 	}
+}
+
+func (m *Manager) Login(content *LoginContent) (*LoginContent, error) {
+	if len(m.loginPlugins) == 0 {
+		return content, nil
+	}
+
+	var (
+		res = &Response{
+			Reject:   false,
+			Unchange: true,
+		}
+		retContent interface{}
+		err        error
+	)
+
+	reqid, _ := util.RandID()
+	xl := xlog.New().AppendPrefix("reqid: " + reqid)
+	ctx := xlog.NewContext(context.Background(), xl)
+	ctx = NewReqidContext(ctx, reqid)
+
+	for _, p := range m.loginPlugins {
+		res, retContent, err = p.Handle(ctx, OpLogin, *content)
+		if err != nil {
+			xl.Warnf("send login request to plugin [%s] error： %v", p.Name(), err)
+			return nil, errors.New("send login request to plugin error")
+		}
+		if res.Reject {
+			return nil, fmt.Errorf("%s", res.RejectReason)
+		}
+		if !res.Unchange {
+			content = retContent.(*LoginContent)
+		}
+	}
+	return content, nil
 }

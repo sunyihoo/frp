@@ -6,10 +6,14 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/fatedier/golib/net/mux"
+	fmux "github.com/hashicorp/yamux"
 	quic "github.com/quic-go/quic-go"
+	"github.com/samber/lo"
 	"github.com/sunyihoo/frp/pkg/auth"
 	v1 "github.com/sunyihoo/frp/pkg/config/v1"
 	modelmetrics "github.com/sunyihoo/frp/pkg/metrics"
+	"github.com/sunyihoo/frp/pkg/msg"
+	"github.com/sunyihoo/frp/pkg/nathole"
 	plugin "github.com/sunyihoo/frp/pkg/plugin/server"
 	"github.com/sunyihoo/frp/pkg/ssh"
 	"github.com/sunyihoo/frp/pkg/transport"
@@ -17,12 +21,15 @@ import (
 	"github.com/sunyihoo/frp/pkg/util/log"
 	netpkg "github.com/sunyihoo/frp/pkg/util/net"
 	"github.com/sunyihoo/frp/pkg/util/tcpmux"
+	"github.com/sunyihoo/frp/pkg/util/util"
 	"github.com/sunyihoo/frp/pkg/util/vhost"
+	"github.com/sunyihoo/frp/pkg/util/xlog"
 	"github.com/sunyihoo/frp/server/controller"
 	"github.com/sunyihoo/frp/server/group"
 	"github.com/sunyihoo/frp/server/ports"
 	"github.com/sunyihoo/frp/server/proxy"
 	"github.com/sunyihoo/frp/server/visitor"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -30,6 +37,7 @@ import (
 )
 
 const (
+	connReadTimeout       time.Duration = 10 * time.Second
 	vhostReadWriteTimeout time.Duration = 30 * time.Second
 )
 
@@ -73,7 +81,7 @@ type Service struct {
 	// 仪表板 UI 和 API 的 Web 服务器
 	webServer *httppkg.Server
 
-	sshTunnelGateWay *ssh.GateWay
+	sshTunnelGateWay *ssh.Gateway
 
 	// 根据所选方法验证身份验证
 	authVerifier auth.Verifier
@@ -254,8 +262,191 @@ func NewService(cfg *v1.ServerConfig) (*Service, error) {
 			Handler:           rp,
 			ReadHeaderTimeout: 60 * time.Second,
 		}
-
+		var l net.Listener
+		if httpMuxOn {
+			l = svr.muxer.ListenHTTP(1)
+		} else {
+			l, err = net.Listen("tcp", address)
+			if err != nil {
+				return nil, fmt.Errorf("create vhost http listener error: %v", err)
+			}
+		}
+		go func() {
+			_ = server.Serve(l)
+		}()
+		log.Infof("http service listen on %s", address)
 	}
 
-	return nil, nil
+	// Create https vhost muxer
+	if cfg.VhostHTTPSPort > 0 {
+		var l net.Listener
+		if httpsMuxOn {
+			l = svr.muxer.ListenHTTPS(1)
+		} else {
+			address := net.JoinHostPort(cfg.ProxyBindAddr, strconv.Itoa(cfg.VhostHTTPSPort))
+			l, err = net.Listen("tcp", address)
+			if err != nil {
+				return nil, fmt.Errorf("create server listener error, %v", err)
+			}
+			log.Infof("https service listen on %s", address)
+		}
+
+		svr.rc.VhostHTTPSMuxer, err = vhost.NewHTTPSMuxer(l, vhostReadWriteTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("create vhost hppsMuxer error, %v", err)
+		}
+	}
+
+	// frps tls listener
+	svr.tlsListener = svr.muxer.Listen(2, 1, func(data []byte) bool {
+		// 仅当虚拟主机 HTTPS 端口与绑定端口不同时，TLS第一个字节才能是0x16
+		return int(data[0]) == netpkg.FRPTLSHeadByte || int(data[0]) == 0x16
+	})
+
+	// Create nat hole controller
+	nc, err := nathole.NewController(time.Duration(cfg.NatHoleAnalysisDataReserveHours) * time.Hour)
+	if err != nil {
+		return nil, fmt.Errorf("create nat hole controller error, %v", err)
+	}
+	svr.rc.NatHoleController = nc
+
+	return svr, nil
+}
+
+func (svr *Service) Run(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	svr.ctx = ctx
+	svr.cancel = cancel
+
+	// run dashboard web server
+	if svr.webServer != nil {
+		go func() {
+			log.Infof("dashboard listen on %s", svr.webServer.Address())
+			if err := svr.webServer.Run(); err != nil {
+				log.Warnf("dashboard server exot with error: %v", err)
+			}
+		}()
+	}
+
+	go svr.Hand
+}
+
+func (svr *Service) HandleListener(l net.Listener, internal bool) {
+	// Listen for incoming connections from client.
+	for {
+		c, err := l.Accept()
+		if err != nil {
+			log.Warnf("Listen for incoming connections from client closed")
+			return
+		}
+		// inject xlog object into net.Conn context
+		xl := xlog.New()
+		ctx := context.Background()
+
+		c = netpkg.NewContextConn(xlog.NewContext(ctx, xl), c)
+
+		if !internal {
+			log.Tracef("start check TLS connection...")
+			originConn := c
+			forceTLS := svr.cfg.Transport.TLS.Force
+			var isTLS, custom bool
+			c, isTLS, custom, err = netpkg.CheckAndEnableTLSServerConnWithTimeout(c, svr.tlsConfig, forceTLS, connReadTimeout)
+			if err != nil {
+				log.Warnf("CheckAndEnableTLSServerConnWithTimeout error: %v", err)
+				originConn.Close()
+				continue
+			}
+			log.Tracef("check TLS connection success,isTLS: %v custom: %v internal: %v", isTLS, custom, internal)
+		}
+
+		// Start a new goroutine to handle connection.
+		go func(ctx context.Context, frpConn net.Conn) {
+			if lo.FromPtr(svr.cfg.Transport.TCPMux) && !internal {
+				fmuxCfg := fmux.DefaultConfig()
+				fmuxCfg.KeepAliveInterval = time.Duration(svr.cfg.Transport.TCPMuxKeepaliveInternal) * time.Second
+				fmuxCfg.LogOutput = io.Discard
+				fmuxCfg.MaxStreamWindowSize = 6 * 1024 * 1024
+				session, err := fmux.Server(frpConn, fmuxCfg)
+				if err != nil {
+					log.Warnf("Failed to create mux connection: %v", err)
+					frpConn.Close()
+					return
+				}
+
+				for {
+					stream, err := session.AcceptStream()
+					if err != nil {
+						log.Debugf("Accept new mux stream error: %v", err)
+						session.Close()
+						return
+					}
+					go svr.handleConnection(ctx, stream, internal)
+				}
+			} else {
+				svr.handleConnection(ctx, frpConn, internal)
+			}
+		}(ctx, c)
+	}
+}
+
+func (svr *Service) handleConnection(ctx context.Context, conn net.Conn, internal bool) {
+	xl := xlog.FromContext(ctx)
+
+	var (
+		rawMsg msg.Message
+		err    error
+	)
+
+	_ = conn.SetReadDeadline(time.Now().Add(connReadTimeout))
+	if rawMsg, err = msg.ReadMsg(conn); err != nil {
+		log.Tracef("Failed to read message: %v", err)
+		conn.Close()
+		return
+	}
+	_ = conn.SetReadDeadline(time.Time{})
+
+	switch m := rawMsg.(type) {
+	case *msg.Login:
+		// 服务器插件钩子 server plugin hook
+		content := &plugin.LoginContent{
+			Login:         *m,
+			ClientAddress: conn.RemoteAddr().String(),
+		}
+		retContent, err := svr.pluginManager.Login(content)
+		if err == nil {
+			m = &retContent.Login
+			err = svr.Re
+		}
+	}
+
+}
+
+func (svr *Service) RegisterControl(ctlConn net.Conn, loginMsg *msg.Login, internal bool) error {
+	var err error
+	if loginMsg.RunID == "" {
+		loginMsg.RunID, err = util.RandID()
+		if err != nil {
+			return err
+		}
+	}
+
+	ctx := netpkg.NewContextFromConn(ctlConn)
+	xl := xlog.FromContextSafe(ctx)
+	xl.AppendPrefix(loginMsg.RunID)
+	ctx = xlog.NewContext(ctx, xl)
+	xl.Infof("client login info: ip [%s] version [%s] hostname [%s] os [%s] arch [%s]",
+		ctlConn.RemoteAddr().String(), loginMsg.Version, loginMsg.Hostname, loginMsg.Os, loginMsg.Arch,
+	)
+
+	// Check auth
+	authVerifier := svr.authVerifier
+	if internal && loginMsg.ClientSpec.AlwaysAuthPass {
+		authVerifier = auth.AlwaysPassVerifier
+	}
+	if err := authVerifier.VerifyLogin(loginMsg); err != nil {
+		return err
+	}
+
+	// TODO(fatedier): use SessionContext
+	ctl, err := NewCon
 }

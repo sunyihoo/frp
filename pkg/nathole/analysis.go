@@ -34,3 +34,10 @@ type Analyzer struct {
 
 	my sync.Mutex
 }
+
+func NewAnalyzer(dataReserveDuration time.Duration) *Analyzer {
+	return &Analyzer{
+		records:             make(map[string]*MakeHoleRecords),
+		dataReserveDuration: dataReserveDuration,
+	}
+}
