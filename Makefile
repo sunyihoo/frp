@@ -7,6 +7,7 @@ all: env fmt build
 
 build: frps frpc
 
+
 env:
 	@go version
 
@@ -33,11 +34,11 @@ frpc:
 	env CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -tags frpc -o bin/fprc ./cmd/frpc
 
 stat:
-	git show --shortstat
-
-
+	@git diff --numstat HEAD~1 HEAD -- '*.go' | \
+	awk '{added += $$1; deleted += $$2} END {print "Added lines:", added, "Deleted lines:", deleted, "Total change:", added + deleted}'
 clean:
 	rm -f ./bin/frpc
 	rm -f ./bin/frps
 	rm -rf ./lastversion
+
 

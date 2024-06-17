@@ -2,6 +2,8 @@ package net
 
 import (
 	"context"
+	"github.com/fatedier/golib/crypto"
+	"io"
 	"net"
 )
 
@@ -32,4 +34,19 @@ func NewContextConn(ctx context.Context, c net.Conn) *ContextConn {
 		Conn: c,
 		ctx:  ctx,
 	}
+}
+
+func NewCryptoReadWriter(rw io.ReadWriter, key []byte) (io.ReadWriter, error) {
+	encReader := crypto.NewReader(rw, key)
+	encWriter, err := crypto.NewWriter(rw, key)
+	if err != nil {
+		return nil, err
+	}
+	return struct {
+		io.Reader
+		io.Writer
+	}{
+		Reader: encReader,
+		Writer: encWriter,
+	}, nil
 }

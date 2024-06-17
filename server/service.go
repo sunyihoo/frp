@@ -331,6 +331,38 @@ func (svr *Service) Run(ctx context.Context) {
 	go svr.Hand
 }
 
+func (svr *Service) handleConnection(ctx context.Context, conn net.Conn, internal bool) {
+	xl := xlog.FromContextSafe(ctx)
+
+	var (
+		rawMsg msg.Message
+		err    error
+	)
+
+	_ = conn.SetReadDeadline(time.Now().Add(connReadTimeout))
+	if rawMsg, err = msg.ReadMsg(conn); err != nil {
+		log.Tracef("Failed to read message: %v", err)
+		conn.Close()
+		return
+	}
+	_ = conn.SetReadDeadline(time.Time{})
+
+	switch m := rawMsg.(type) {
+	case *msg.Login:
+		// 服务器插件钩子 server plugin hook
+		content := &plugin.LoginContent{
+			Login:         *m,
+			ClientAddress: conn.RemoteAddr().String(),
+		}
+		retContent, err := svr.pluginManager.Login(content)
+		if err == nil {
+			m = &retContent.Login
+			err = svr.Re
+		}
+	}
+
+}
+
 func (svr *Service) HandleListener(l net.Listener, internal bool) {
 	// Listen for incoming connections from client.
 	for {
@@ -389,39 +421,9 @@ func (svr *Service) HandleListener(l net.Listener, internal bool) {
 	}
 }
 
-func (svr *Service) handleConnection(ctx context.Context, conn net.Conn, internal bool) {
-	xl := xlog.FromContext(ctx)
-
-	var (
-		rawMsg msg.Message
-		err    error
-	)
-
-	_ = conn.SetReadDeadline(time.Now().Add(connReadTimeout))
-	if rawMsg, err = msg.ReadMsg(conn); err != nil {
-		log.Tracef("Failed to read message: %v", err)
-		conn.Close()
-		return
-	}
-	_ = conn.SetReadDeadline(time.Time{})
-
-	switch m := rawMsg.(type) {
-	case *msg.Login:
-		// 服务器插件钩子 server plugin hook
-		content := &plugin.LoginContent{
-			Login:         *m,
-			ClientAddress: conn.RemoteAddr().String(),
-		}
-		retContent, err := svr.pluginManager.Login(content)
-		if err == nil {
-			m = &retContent.Login
-			err = svr.Re
-		}
-	}
-
-}
-
 func (svr *Service) RegisterControl(ctlConn net.Conn, loginMsg *msg.Login, internal bool) error {
+	// 如果客户端的 RunID 为空，则它是一个新客户端，我们只是创建一个新控制器。
+	// 否则，我们会检查是否有一个控制器具有相同的运行 ID。如果是这样，我们释放以前的控制器并启动新的控制器。
 	var err error
 	if loginMsg.RunID == "" {
 		loginMsg.RunID, err = util.RandID()
@@ -448,5 +450,5 @@ func (svr *Service) RegisterControl(ctlConn net.Conn, loginMsg *msg.Login, inter
 	}
 
 	// TODO(fatedier): use SessionContext
-	ctl, err := NewCon
+	ctl, err := NewControl()
 }

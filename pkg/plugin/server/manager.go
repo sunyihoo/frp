@@ -97,3 +97,38 @@ func (m *Manager) Login(content *LoginContent) (*LoginContent, error) {
 	}
 	return content, nil
 }
+
+func (m *Manager) NewProxy(content *NewProxyContent) (*NewProxyContent, error) {
+	if len(m.newProxyPlugins) == 0 {
+		return content, nil
+	}
+
+	var (
+		res = &Response{
+			Reject:   false,
+			Unchange: true,
+		}
+		retContent interface{}
+		err        error
+	)
+	reqid, _ := util.RandID()
+	xl := xlog.New().AppendPrefix("reqid: " + reqid)
+	ctx := xlog.NewContext(context.Background(), xl)
+	ctx = NewReqidContext(ctx, reqid)
+
+	for _, p := range m.newProxyPlugins {
+		res, retContent, err = p.Handle(ctx, OpNewProxy, *content)
+		if err != nil {
+			xl.Warnf("send NewProxy request to plugin [%s] error: %v", p.Name(), err)
+			return nil, fmt.Errorf("send NewProxy request to plugin error")
+		}
+		if res.Reject {
+			return nil, fmt.Errorf("%s", res.RejectReason)
+		}
+		if !res.Unchange {
+			content = retContent.(*NewProxyContent)
+		}
+	}
+	return content, nil
+
+}

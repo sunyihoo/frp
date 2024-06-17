@@ -14,3 +14,16 @@ type Dispatcher struct {
 	msgHandlers    map[reflect.Type]func(Message)
 	defaultHandler func(Message)
 }
+
+func NewDispatcher(rw io.ReadWriter) *Dispatcher {
+	return &Dispatcher{
+		rw:          rw,
+		sendCh:      make(chan Message, 100),
+		doneCh:      make(chan struct{}),
+		msgHandlers: make(map[reflect.Type]func(Message)),
+	}
+}
+
+func (d *Dispatcher) RegisterHandler(msg Message, handler func(Message)) {
+	d.msgHandlers[reflect.TypeOf(msg)] = handler
+}

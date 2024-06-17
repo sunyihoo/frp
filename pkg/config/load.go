@@ -3,9 +3,12 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/sunyihoo/frp/pkg/config/legacy"
 	v1 "github.com/sunyihoo/frp/pkg/config/v1"
+	"github.com/sunyihoo/frp/pkg/msg"
+	"github.com/sunyihoo/frp/pkg/util/util"
 	"gopkg.in/ini.v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"os"
@@ -143,4 +146,18 @@ func LoadConfigure(b []byte, c any, strict bool) error {
 		return yaml.UnmarshalStrict(b, c)
 	}
 	return yaml.Unmarshal(b, c)
+}
+
+func NewProxyConfigurerFromMsg(m *msg.NewProxy, serverCfg *v1.ServerConfig) (v1.ProxyConfigurer, error) {
+	m.ProxyType = util.EmptyOr(m.ProxyType, string(v1.ProxyTypeTCP))
+
+	configurer := v1.NewProxyConfigurerByType(v1.ProxyType(m.ProxyType))
+	if configurer == nil {
+		return nil, fmt.Errorf("unknown proxy type: %s", m.ProxyType)
+	}
+
+	configurer.UnmarshalFromMsg(m)
+	configurer.Complete("")
+
+	if err := valitation.Va
 }

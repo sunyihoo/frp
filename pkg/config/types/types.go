@@ -1,14 +1,73 @@
 package types
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-type BandwidthWithQuantity struct {
+const (
+	MB = 1024 * 1024
+	KB = 1024
+
+	BandwidthLimitModeClient = "client"
+	BandwidthLimitModeServer = "server"
+)
+
+type BandwidthQuantity struct {
 	s string // MB or KB
-	i int64  // bytes
+
+	i int64 // bytes
+}
+
+func NewBandwidthQuantity(s string) (BandwidthQuantity, error) {
+	q := BandwidthQuantity{}
+	err := q.UnmarshalString(s)
+	if err != nil {
+		return q, err
+	}
+	return q, nil
+}
+
+func (q *BandwidthQuantity) String() string {
+	return q.s
+}
+
+func (q *BandwidthQuantity) UnmarshalString(s string) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+
+	var (
+		base int64
+		f    float64
+		err  error
+	)
+	switch {
+	case strings.HasSuffix(s, "MB"):
+		base = MB
+		fstr := strings.TrimSuffix(s, "MB")
+		f, err = strconv.ParseFloat(fstr, 64)
+		if err != nil {
+			return err
+		}
+	case strings.HasSuffix(s, "KB"):
+		base = KB
+		fstr := strings.TrimSuffix(s, "KB")
+		f, err = strconv.ParseFloat(fstr, 64)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New("unit not support")
+	}
+
+	q.s = s
+	q.i = int64(f * float64(base))
+	return nil
+
 }
 
 type PortsRange struct {

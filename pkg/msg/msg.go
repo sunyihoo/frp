@@ -99,22 +99,22 @@ type LoginResp struct {
 type NewProxy struct {
 	ProxyName          string            `json:"proxy_name,omitempty"`
 	ProxyType          string            `json:"proxy_type,omitempty"`
-	UserEncryption     bool              `json:"user_encryption,omitempty"`
+	UseEncryption      bool              `json:"use_encryption,omitempty"`
 	UseCompression     bool              `json:"use_compression,omitempty"`
-	BandWidthLimit     string            `json:"bandwidth_limit,omitempty"`
-	BandWidthLimitMode string            `json:"band_width_limit_mode,omitempty"`
+	BandwidthLimit     string            `json:"bandwidth_limit,omitempty"`
+	BandwidthLimitMode string            `json:"bandwidth_limit_mode,omitempty"`
 	Group              string            `json:"group,omitempty"`
 	GroupKey           string            `json:"group_key,omitempty"`
 	Metas              map[string]string `json:"metas,omitempty"`
 	Annotations        map[string]string `json:"annotations,omitempty"`
 
 	// 仅有tcp和udp用该端口
-	RemotePort string `json:"remote_port,omitempty"`
+	RemotePort int `json:"remote_port,omitempty"`
 
 	// 仅http和https
 	CustomDomains     []string          `json:"custom_domains,omitempty"`
 	SubDomain         string            `json:"sub_domain,omitempty"`
-	Locations         string            `json:"locations,omitempty"`
+	Locations         []string          `json:"locations,omitempty"`
 	HTTPUser          string            `json:"http_user,omitempty"`
 	HTTPPwd           string            `json:"http_pwd,omitempty"`
 	HostHeaderRewrite string            `json:"host_header_rewrite,omitempty"`

@@ -40,3 +40,8 @@ type UserInfo struct {
 	Metas map[string]string `json:"metas"`
 	RunID string            `json:"runID"`
 }
+
+type NewProxyContent struct {
+	User UserInfo `json:"user"`
+	msg.NewProxy
+}
