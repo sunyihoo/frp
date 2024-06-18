@@ -84,6 +84,13 @@ func ParseRangeNumbers(rangeStr string) (numbers []int64, err error) {
 	return
 }
 
+func GenerateResponseErrorString(summary string, err error, detailed bool) string {
+	if detailed {
+		return err.Error()
+	}
+	return summary
+}
+
 func ConstantTimeEqString(a, b string) bool {
 	// todo 学习
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1

@@ -67,7 +67,10 @@ func (q *BandwidthQuantity) UnmarshalString(s string) error {
 	q.s = s
 	q.i = int64(f * float64(base))
 	return nil
+}
 
+func (q *BandwidthQuantity) Bytes() int64 {
+	return q.i
 }
 
 type PortsRange struct {

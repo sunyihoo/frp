@@ -7,6 +7,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/sunyihoo/frp/pkg/config/legacy"
 	v1 "github.com/sunyihoo/frp/pkg/config/v1"
+	"github.com/sunyihoo/frp/pkg/config/v1/validation"
 	"github.com/sunyihoo/frp/pkg/msg"
 	"github.com/sunyihoo/frp/pkg/util/util"
 	"gopkg.in/ini.v1"
@@ -159,5 +160,8 @@ func NewProxyConfigurerFromMsg(m *msg.NewProxy, serverCfg *v1.ServerConfig) (v1.
 	configurer.UnmarshalFromMsg(m)
 	configurer.Complete("")
 
-	if err := valitation.Va
+	if err := validation.ValidateProxyConfigurerForServer(configurer, serverCfg); err != nil {
+		return nil, err
+	}
+	return configurer, nil
 }
