@@ -138,8 +138,8 @@ func NewControl(
 		ctl.msgDispatcher = msg.NewDispatcher(ctl.conn)
 	}
 	ctl.registerMsgHandlers()
-	ctl.msgTransporter = transport.New
-
+	ctl.msgTransporter = transport.NewMessageTransporter(ctl.msgDispatcher.SendChannel())
+	return ctl, nil
 }
 
 // GetWorkConn
@@ -192,7 +192,7 @@ func (ctl *Control) GetWorkConn() (workConn net.Conn, err error) {
 func (ctl *Control) registerMsgHandlers() {
 	ctl.msgDispatcher.RegisterHandler(&msg.NewProxy{}, ctl.handleNewProxy)
 	ctl.msgDispatcher.RegisterHandler(&msg.Ping{}, ctl.handlePing)
-	ctl.msgDispatcher.RegisterHandler(&msg.NatHoleVisitor{}, msg.AsyncHandler(ctl.))
+	ctl.msgDispatcher.RegisterHandler(&msg.NatHoleVisitor{}, msg.AsyncHandler(ctl.handleNatHoleVisitor))
 }
 
 func (ctl *Control) handleNewProxy(m msg.Message) {

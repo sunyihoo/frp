@@ -328,7 +328,7 @@ func (svr *Service) Run(ctx context.Context) {
 		}()
 	}
 
-	go svr.Hand
+	go svr.HandleListener(svr.sshTunnelListener, true)
 }
 
 func (svr *Service) handleConnection(ctx context.Context, conn net.Conn, internal bool) {
@@ -357,12 +357,16 @@ func (svr *Service) handleConnection(ctx context.Context, conn net.Conn, interna
 		retContent, err := svr.pluginManager.Login(content)
 		if err == nil {
 			m = &retContent.Login
-			err = svr.Re
+			err = svr.RegisterControl(conn, m, internal)
 		}
+
 	}
 
 }
 
+// HandleListener 接受来自客户端的连接，并调用 handleConnection 来处理它们。
+// 如果 internal 为 true，则表示此侦听器用于内部通信，如 ssh 隧道网关。
+// TODO(fatedier): Pass some parameters of listener/connection through context to avoid passing too many parameters. TODO（fatedier）：通过上下文传递 listenerconnection 的一些参数，避免传递过多的参数。
 func (svr *Service) HandleListener(l net.Listener, internal bool) {
 	// Listen for incoming connections from client.
 	for {
