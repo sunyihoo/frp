@@ -1,6 +1,7 @@
 package nathole
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
@@ -83,6 +84,22 @@ func NewController(analysisDataReserveDuration time.Duration) (*Controller, erro
 		sessions:   make(map[string]*Session),
 		analyzer:   NewAnalyzer(analysisDataReserveDuration),
 	}, nil
+}
+
+func (c *Controller) CleanWorker(ctx context.Context) {
+	// todo 学习
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			start := time.Now()
+			count, total := c.analyzer.Clean()
+			log.Tracef("clean %d|%d nathole data, cost: %v", count, total, time.Since(start))
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (c *Controller) GenSid() string {
@@ -190,6 +207,37 @@ func (c *Controller) HandleVisitor(m *msg.NatHoleVisitor, transporter transport.
 	_ = g.Wait()
 
 	time.Sleep(time.Duration(cResp.DetectBehavior.ReadTimeoutMs+30000) * time.Millisecond)
+}
+
+func (c *Controller) HandleClient(m *msg.NatHoleClient, transporter transport.MessageTransporter) {
+	c.mu.RLock()
+	session, ok := c.sessions[m.Sid]
+	c.mu.RUnlock()
+	if !ok {
+		return
+	}
+	log.Tracef("handle client message, sid [%s],server name: %s", session.sid, m.ProxyName)
+	session.clientMsg = m
+	session.clientTransporter = transporter
+	select {
+	case session.notifyCh <- struct{}{}:
+	default:
+	}
+}
+
+func (c *Controller) HandleReport(m *msg.NatHoleReport) {
+	c.mu.RLock()
+	session, ok := c.sessions[m.Sid]
+	c.mu.RUnlock()
+	if !ok {
+		log.Tracef("sid [%s] report make hole success: %v, but session not fount", m.Sid, m.Success)
+		return
+	}
+	if m.Success {
+		c.analyzer.ReportSuccess(session.analysisKey, session.recommandMode, session.recommandIndex)
+	}
+	log.Infof("sid [%s] report make hole success: %v, mode %v, index %v",
+		m.Sid, m.Success, session.recommandMode, session.recommandIndex)
 }
 
 func (c *Controller) GenNatHoleResponse(transactionID string, session *Session, errInfo string) *msg.NatHoleResp {

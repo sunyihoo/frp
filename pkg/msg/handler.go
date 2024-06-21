@@ -44,6 +44,38 @@ func NewDispatcher(rw io.ReadWriter) *Dispatcher {
 	}
 }
 
+func (d *Dispatcher) Run() {
+	go d.sendLoop()
+	go d.readLoop()
+}
+
+func (d *Dispatcher) sendLoop() {
+	for {
+		select {
+		case <-d.doneCh:
+			return
+		case m := <-d.sendCh:
+			_ = WriteMsg(d.rw, m)
+		}
+	}
+}
+
+func (d *Dispatcher) readLoop() {
+	for {
+		m, err := ReadMsg(d.rw)
+		if err != nil {
+			close(d.doneCh)
+			return
+		}
+
+		if handler, ok := d.msgHandlers[reflect.TypeOf(m)]; ok {
+			handler(m)
+		} else if d.defaultHandler != nil {
+			d.defaultHandler(m)
+		}
+	}
+}
+
 func (d *Dispatcher) Send(m Message) error {
 	select {
 	case <-d.doneCh:
@@ -59,4 +91,8 @@ func (d *Dispatcher) SendChannel() chan Message {
 
 func (d *Dispatcher) RegisterHandler(msg Message, handler func(Message)) {
 	d.msgHandlers[reflect.TypeOf(msg)] = handler
+}
+
+func (d *Dispatcher) Done() chan struct{} {
+	return d.doneCh
 }

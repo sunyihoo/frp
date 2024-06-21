@@ -86,6 +86,23 @@ func NewGateway(
 	}, nil
 }
 
+func (g *Gateway) Run() {
+	for{
+		conn,err := g.ln.Accept()
+		if err != nil {
+			return
+		}
+		go g.handleConn(conn)
+	}
+}
+
+func (g *Gateway) handleConn(conn net.Conn) {
+	defer conn.Close()
+
+	ts,err :=
+}
+
+
 func loadAuthorizedKeysFromFile(path string) (map[string]string, error) {
 	authorizedKeysMap := make(map[string]string) // value is username
 	authorizedKeysBytes, err := os.ReadFile(path)

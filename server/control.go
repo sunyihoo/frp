@@ -13,10 +13,12 @@ import (
 	"github.com/sunyihoo/frp/pkg/transport"
 	netpkg "github.com/sunyihoo/frp/pkg/util/net"
 	"github.com/sunyihoo/frp/pkg/util/util"
+	"github.com/sunyihoo/frp/pkg/util/version"
 	"github.com/sunyihoo/frp/pkg/util/xlog"
 	"github.com/sunyihoo/frp/server/controller"
 	"github.com/sunyihoo/frp/server/metrics"
 	"github.com/sunyihoo/frp/server/proxy"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"net"
 	"runtime/debug"
 	"sync"
@@ -35,6 +37,35 @@ func NewControlManager() *ControlManager {
 	return &ControlManager{
 		ctlsByRunID: make(map[string]*Control),
 	}
+}
+
+func (cm *ControlManager) Add(runID string, ctl *Control) (old *Control) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	var ok bool
+	old, ok = cm.ctlsByRunID[runID]
+	if ok {
+		old.Replaced(ctl)
+	}
+	cm.ctlsByRunID[runID] = ctl
+	return
+}
+
+// Del 我们应该确保它是否是相同的控件，以防止删除新控件
+func (cm *ControlManager) Del(runID string, ctl *Control) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if c, ok := cm.ctlsByRunID[runID]; ok && c == ctl {
+		delete(cm.ctlsByRunID, runID)
+	}
+}
+
+func (cm *ControlManager) GetByID(runID string) (ctl *Control, ok bool) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	ctl, ok = cm.ctlsByRunID[runID]
+	return
 }
 
 type Control struct {
@@ -142,6 +173,49 @@ func NewControl(
 	return ctl, nil
 }
 
+func (ctl *Control) Start() {
+	loginRespMsg := &msg.LoginResp{
+		Version: version.Full(),
+		RunID:   ctl.runID,
+		Error:   "",
+	}
+	_ = msg.WriteMsg(ctl.conn, loginRespMsg)
+
+	go func() {
+		for i := 0; i < ctl.poolCount; i++ {
+			// ignore error here, that means that this control is closed
+			_ = ctl.msgDispatcher.Send(&msg.ReqWorkConn{})
+		}
+	}()
+	go ctl.worker()
+}
+
+func (ctl *Control) Replaced(newCtl *Control) {
+	xl := ctl.xl
+	xl.Infof("Replaced by client [%s]", newCtl.runID)
+	ctl.runID = ""
+	ctl.conn.Close()
+}
+
+func (ctl *Control) RegisterWorkConn(conn net.Conn) error {
+	xl := ctl.xl
+	defer func() {
+		if err := recover(); err != nil {
+			xl.Errorf("panic error: %v", err)
+			xl.Errorf(string(debug.Stack()))
+		}
+	}()
+
+	select {
+	case ctl.workConnCh <- conn:
+		xl.Debugf("new work connection registered")
+		return nil
+	default:
+		xl.Debugf("work connection pool is full, discarding")
+		return fmt.Errorf("work connection pool is full, discarding")
+	}
+}
+
 // GetWorkConn
 // 当 frps 获得一个用户连接时，我们从池中获取一个工作连接并返回它。
 // 如果池中没有可用的 workConn，请向 frpc 发送消息以获取一个或多个，并等待它可用。
@@ -189,10 +263,76 @@ func (ctl *Control) GetWorkConn() (workConn net.Conn, err error) {
 	return
 }
 
+func (ctl *Control) heartbeatWorker() {
+	if ctl.serverCfg.Transport.HeartbeatTimeout <= 0 {
+		return
+	}
+
+	xl := ctl.xl
+	// todo 学习
+	go wait.Until(func() {
+		if time.Since(ctl.lastPing.Load().(time.Time)) > time.Duration(ctl.serverCfg.Transport.HeartbeatTimeout)*time.Second {
+			xl.Warnf("heartbeat timeout")
+			ctl.conn.Close()
+			return
+		}
+	}, time.Second, ctl.doneCh)
+}
+
+// WaitClosed block until Control closed. 阻塞直到 Control 关闭
+func (ctl *Control) WaitClosed() {
+	<-ctl.doneCh
+}
+
+func (ctl *Control) worker() {
+	xl := ctl.xl
+
+	go ctl.heartbeatWorker()
+	go ctl.msgDispatcher.Run()
+
+	<-ctl.msgDispatcher.Done()
+	ctl.conn.Close()
+
+	ctl.mu.Lock()
+	defer ctl.mu.Unlock()
+
+	close(ctl.workConnCh)
+	for workConn := range ctl.workConnCh {
+		workConn.Close()
+	}
+
+	for _, pxy := range ctl.proxies {
+		pxy.Close()
+		ctl.pxyManager.Del(pxy.GetName())
+		metrics.Server.CloseProxy(pxy.GetName(), pxy.GetConfigurer().GetBaseConfig().Type)
+
+		notifyContent := &plugin.CloseProxyContent{
+			User: plugin.UserInfo{
+				User:  ctl.loginMsg.User,
+				Metas: ctl.loginMsg.Metas,
+				RunID: ctl.loginMsg.RunID,
+			},
+			CloseProxy: msg.CloseProxy{
+				ProxyName: pxy.GetName(),
+			},
+		}
+		go func() {
+			_ = ctl.pluginManager.CloseProxy(notifyContent)
+		}()
+	}
+
+	metrics.Server.CloseClient()
+	xl.Infof("client exit success")
+	close(ctl.doneCh)
+}
+
 func (ctl *Control) registerMsgHandlers() {
 	ctl.msgDispatcher.RegisterHandler(&msg.NewProxy{}, ctl.handleNewProxy)
 	ctl.msgDispatcher.RegisterHandler(&msg.Ping{}, ctl.handlePing)
 	ctl.msgDispatcher.RegisterHandler(&msg.NatHoleVisitor{}, msg.AsyncHandler(ctl.handleNatHoleVisitor))
+	ctl.msgDispatcher.RegisterHandler(&msg.NatHoleClient{}, msg.AsyncHandler(ctl.handleNatHoleClient))
+	ctl.msgDispatcher.RegisterHandler(&msg.NatHoleReport{}, msg.AsyncHandler(ctl.handleNatHoleReport))
+	ctl.msgDispatcher.RegisterHandler(&msg.CloseProxy{}, ctl.handleCloseProxy)
 }
 
 func (ctl *Control) handleNewProxy(m msg.Message) {
@@ -261,7 +401,24 @@ func (ctl *Control) handlePing(m msg.Message) {
 
 func (ctl *Control) handleNatHoleVisitor(m msg.Message) {
 	inMsg := m.(*msg.NatHoleVisitor)
-	ctl.rc.NatHoleController
+	ctl.rc.NatHoleController.HandleVisitor(inMsg, ctl.msgTransporter, ctl.loginMsg.User)
+}
+
+func (ctl *Control) handleNatHoleClient(m msg.Message) {
+	inMsg := m.(*msg.NatHoleClient)
+	ctl.rc.NatHoleController.HandleClient(inMsg, ctl.msgTransporter)
+}
+
+func (ctl *Control) handleNatHoleReport(m msg.Message) {
+	inMsg := m.(*msg.NatHoleReport)
+	ctl.rc.NatHoleController.HandleReport(inMsg)
+}
+
+func (ctl *Control) handleCloseProxy(m msg.Message) {
+	xl := ctl.xl
+	inMsg := m.(*msg.CloseProxy)
+	_ = ctl.CloseProxy(inMsg)
+	xl.Infof("close proxy [%s] success", inMsg.ProxyName)
 }
 
 func (ctl *Control) RegisterProxy(pxyMsg *msg.NewProxy) (remoteAddr string, err error) {
@@ -337,5 +494,37 @@ func (ctl *Control) RegisterProxy(pxyMsg *msg.NewProxy) (remoteAddr string, err 
 	ctl.mu.Lock()
 	ctl.proxies[pxy.GetName()] = pxy
 	ctl.mu.Unlock()
+	return
+}
+
+func (ctl *Control) CloseProxy(closeMsg *msg.CloseProxy) (err error) {
+	ctl.mu.Lock()
+	pxy, ok := ctl.proxies[closeMsg.ProxyName]
+	if !ok {
+		ctl.mu.Lock()
+		return
+	}
+	if ctl.serverCfg.MaxPortsPerClient > 0 {
+		ctl.portsUsedNum -= pxy.GetUsedPortsNum()
+	}
+	pxy.Close()
+	ctl.pxyManager.Del(closeMsg.ProxyName)
+	ctl.mu.Unlock()
+
+	metrics.Server.CloseProxy(pxy.GetName(), pxy.GetConfigurer().GetBaseConfig().Type)
+
+	notifyContent := &plugin.CloseProxyContent{
+		User: plugin.UserInfo{
+			User:  ctl.loginMsg.User,
+			Metas: ctl.loginMsg.Metas,
+			RunID: ctl.loginMsg.RunID,
+		},
+		CloseProxy: msg.CloseProxy{
+			ProxyName: pxy.GetName(),
+		},
+	}
+	go func() {
+		_ = ctl.pluginManager.CloseProxy(notifyContent)
+	}()
 	return
 }

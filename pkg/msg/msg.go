@@ -168,7 +168,7 @@ type NewVisitorConn struct {
 
 type NewVisitorConnResp struct {
 	ProxyName string `json:"proxy_name,omitempty"`
-	Timestamp int64  `json:"timestamp,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 type Ping struct {

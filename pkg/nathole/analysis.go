@@ -216,6 +216,22 @@ func NewMakeHoleRecords(c, v *NatFeature) *MakeHoleRecords {
 	return &MakeHoleRecords{scores: scores, LastUpdateTime: time.Now()}
 }
 
+func (mhr *MakeHoleRecords) ReportSuccess(mode int, index int) {
+	mhr.mu.Lock()
+	defer mhr.mu.Unlock()
+	mhr.LastUpdateTime = time.Now()
+	for i := range mhr.scores {
+		score := mhr.scores[i]
+		if score.Mode != mode || score.Index != index {
+			continue
+		}
+
+		score.Score += 2
+		score.Score = min(score.Score, 10)
+		return
+	}
+}
+
 func (mhr *MakeHoleRecords) Recommand() (mode, index int) {
 	mhr.mu.Lock()
 	defer mhr.mu.Unlock()
@@ -283,4 +299,34 @@ func (a *Analyzer) GetRecommandBehavior(key string, c, v *NatFeature) (mode, ind
 		}
 	}
 	return mode, index, cBehavior, vBehavior
+}
+
+func (a *Analyzer) ReportSuccess(key string, mode, index int) {
+	a.mu.Lock()
+	records, ok := a.records[key]
+	a.mu.Unlock()
+	if !ok {
+		return
+	}
+	records.ReportSuccess(mode, index)
+}
+
+func (a *Analyzer) Clean() (int, int) {
+	now := time.Now()
+	total := 0
+	count := 0
+
+	// cleanup 10w records may take 5ms
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	total = len(a.records)
+	// clean up records that have not been used for a period of time
+	for key, records := range a.records {
+		if now.Sub(records.LastUpdateTime) > a.dataReserveDuration {
+			delete(a.records, key)
+			count++
+		}
+	}
+	return count, total
+
 }

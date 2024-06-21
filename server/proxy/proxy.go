@@ -165,6 +165,12 @@ func (pm *Manager) Exist(name string) bool {
 	return ok
 }
 
+func (pm *Manager) Del(name string) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	delete(pm.pxys, name)
+}
+
 func (pm *Manager) GetByName(name string) (pxy Proxy, ok bool) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()

@@ -19,3 +19,7 @@ func init() {
 func ReadMsg(c io.Reader) (msg Message, err error) {
 	return msgCtl.ReadMsg(c)
 }
+
+func WriteMsg(c io.Writer, msg interface{}) (err error) {
+	return msgCtl.WriteMsg(c, msg)
+}
