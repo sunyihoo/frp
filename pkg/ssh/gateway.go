@@ -87,8 +87,8 @@ func NewGateway(
 }
 
 func (g *Gateway) Run() {
-	for{
-		conn,err := g.ln.Accept()
+	for {
+		conn, err := g.ln.Accept()
 		if err != nil {
 			return
 		}
@@ -99,9 +99,14 @@ func (g *Gateway) Run() {
 func (g *Gateway) handleConn(conn net.Conn) {
 	defer conn.Close()
 
-	ts,err :=
+	ts, err := NewTunnelServer(conn, g.sshConfig, g.peerServerListener)
+	if err != nil {
+		return
+	}
+	if err := ts.Run(); err != nil {
+		log.Errorf("ssh tunnel server run error: %v", err)
+	}
 }
-
 
 func loadAuthorizedKeysFromFile(path string) (map[string]string, error) {
 	authorizedKeysMap := make(map[string]string) // value is username

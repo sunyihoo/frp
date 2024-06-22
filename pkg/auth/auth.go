@@ -5,6 +5,12 @@ import (
 	"github.com/sunyihoo/frp/pkg/msg"
 )
 
+type Setter interface {
+	SetLogin(*msg.Login) error
+	SetPing(*msg.Ping) error
+	SetNewWorkConn(*msg.NewWorkConn) error
+}
+
 type Verifier interface {
 	VerifyLogin(*msg.Login) error
 	VerifyPing(*msg.Ping) error

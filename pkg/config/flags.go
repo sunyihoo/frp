@@ -20,7 +20,23 @@ type registerFlagOptions struct {
 	sshMode bool
 }
 
-// Todo RegisterServerConfigFlags
+func WithSSHMode() RegisterFlagOption {
+	return func(o *registerFlagOptions) {
+		o.sshMode = true
+	}
+}
+
+// todo 未完成RegisterProxyFlags
+func RegisterProxyFlags(cmd *cobra.Command, c *v1.ProxyConfigurer, opts ...RegisterFlagOption) {
+
+}
+
+// todo RegisterClientCommonConfigFlags
+func RegisterClientCommonConfigFlags(cmd *cobra.Command, c *v1.ClientCommonConfig, opts ...RegisterFlagOption) {
+
+}
+
+// Todo 未完成RegisterServerConfigFlags
 func RegisterServerConfigFlags(cmd *cobra.Command, c *v1.ServerConfig, opts ...RegisterFlagOption) {
 
 }
